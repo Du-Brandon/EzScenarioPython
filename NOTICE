@@ -1,0 +1,10 @@
+EzScenarioPython
+
+This product includes a Python port derived from ezSpec, originally developed
+by Teddy Chen and the ezKanban Team.
+
+Original project: https://gitlab.com/TeddyChen/ezspec
+Original artifact: tw.teddysoft.ezspec:ezspec-core:2.0.4
+
+The original software and this derivative work are distributed under the
+Apache License, Version 2.0.
