@@ -24,6 +24,10 @@ Validated on Windows with Python 3.11.2: all 199 tests pass with both pytest 8.3
 
 ## Install from source
 
+**Platform verification:** Installation and tests have only been verified on
+Windows with Python 3.11.2. The Linux/macOS instructions below are provided for
+reference and have not been tested with this project.
+
 Clone this repository or download its source archive, open a terminal in the
 project directory, and create a virtual environment:
 
@@ -33,8 +37,9 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-On Linux or macOS, activate it with `source .venv/bin/activate`. Then install
-the project together with pytest and run its specifications:
+For Linux/macOS (untested), the activation command is
+`source .venv/bin/activate`. Then install the project together with pytest and
+run its specifications:
 
 ```powershell
 python -m pip install -e ".[dev]"
@@ -322,6 +327,7 @@ for the execution contract.
 - Local validation covers Windows / Python 3.11.2 with pytest 8.3.3 and 9.1.1.
   The GitHub workflow also defines Linux and Python 3.12/3.13 checks; those
   environments remain unverified until CI has run successfully.
+  macOS has not been tested and is not included in the current CI matrix.
 
 ## License and contributions
 
