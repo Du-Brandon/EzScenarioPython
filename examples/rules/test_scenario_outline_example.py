@@ -1,11 +1,16 @@
-"""Scenario outlines assigned directly to user-created Rules."""
+"""Scenario outlines assigned directly to user-created Rules.
+
+Adapted from ezspec-sample's example/rules/ScenarioOutlineExample.java for Python,
+pytest, and collection-time examples. See NOTICE and docs/SOURCE_PROVENANCE.md
+for source and project attribution.
+"""
 
 from ezspec import (
     EzFeature,
     EzScenarioOutline,
     Feature,
+    OutlineDefinition,
     ScenarioEnvironment,
-    ScenarioOutline,
 )
 from ezspec.extension.pytest import PytestExamples
 
@@ -39,6 +44,11 @@ class ZeroDollarInvoiceExample(PytestExamples):
         return ZERO_DOLLAR_INVOICE_TABLE
 
 
+TAX_CALCULATION_EXAMPLE = PytestExamples.get(TaxCalculationExample)
+ZERO_DOLLAR_INVOICE_EXAMPLE = PytestExamples.get(ZeroDollarInvoiceExample)
+TAX_EXAMPLES = [TAX_CALCULATION_EXAMPLE, ZERO_DOLLAR_INVOICE_EXAMPLE]
+
+
 def remember_tax_excluded_input(env: ScenarioEnvironment) -> None:
     env.put("tax excluded price", env.getInput().get("tax_excluded"))
 
@@ -57,7 +67,7 @@ def verify_tax_included_price(env: ScenarioEnvironment) -> None:
     assert expected == env.get("tax included price")
 
 
-def add_tax_calculation_steps(outline: ScenarioOutline) -> ScenarioOutline:
+def add_tax_calculation_steps(outline: OutlineDefinition) -> OutlineDefinition:
     """Add the same named callbacks used by all three Java examples."""
 
     return (
@@ -81,31 +91,29 @@ class ScenarioOutlineExample:
         "scenario outline with example"
     )
 
-    @EzScenarioOutline
-    def scenario_outline_example_with_table_input(self) -> None:
-        outline = ScenarioOutline.New(self.scenario_outline_with_table).WithExamples(
-            TAX_CALCULATION_TABLE
+    @EzScenarioOutline(
+        examples=TAX_CALCULATION_TABLE,
+        rule="scenario outline with table",
+    )
+    def scenario_outline_example_with_table_input(self) -> OutlineDefinition:
+        outline = self.feature.defineScenarioOutline().withRule(
+            self.scenario_outline_with_table
         )
-        add_tax_calculation_steps(outline).Execute()
+        return add_tax_calculation_steps(outline)
 
-    @EzScenarioOutline
-    def scenario_outline_example_with_variable_arguments(self) -> None:
-        outline = ScenarioOutline.New(
+    @EzScenarioOutline(
+        examples=(TAX_CALCULATION_EXAMPLE, ZERO_DOLLAR_INVOICE_EXAMPLE),
+        rule="scenario outline with example",
+    )
+    def scenario_outline_example_with_variable_arguments(self) -> OutlineDefinition:
+        outline = self.feature.defineScenarioOutline().withRule(
             self.scenario_outline_with_examples
-        ).WithExamples(
-            PytestExamples.get(TaxCalculationExample),
-            PytestExamples.get(ZeroDollarInvoiceExample),
         )
-        add_tax_calculation_steps(outline).Execute()
+        return add_tax_calculation_steps(outline)
 
-    @EzScenarioOutline
-    def scenario_outline_example_with_list_of_example(self) -> None:
-        examples = [
-            PytestExamples.get(TaxCalculationExample),
-            PytestExamples.get(ZeroDollarInvoiceExample),
-        ]
-
-        outline = ScenarioOutline.New(
+    @EzScenarioOutline(examples=TAX_EXAMPLES, rule="scenario outline with example")
+    def scenario_outline_example_with_list_of_example(self) -> OutlineDefinition:
+        outline = self.feature.defineScenarioOutline().withRule(
             self.scenario_outline_with_examples
-        ).WithExamples(examples)
-        add_tax_calculation_steps(outline).Execute()
+        )
+        return add_tax_calculation_steps(outline)

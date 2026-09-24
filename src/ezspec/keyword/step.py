@@ -1,4 +1,9 @@
-"""Gherkin step model and keyword-specific step classes."""
+"""Gherkin step model and keyword-specific step classes.
+
+Adapted from ezSpec's Step.java, step keyword classes, and ConcurrentGroup.java.
+Original Java author: Teddy Chen. Modified for Python;
+see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 

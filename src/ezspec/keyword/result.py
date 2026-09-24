@@ -1,4 +1,9 @@
-"""Execution outcomes and step results."""
+"""Execution outcomes and step results.
+
+Adapted from ezSpec's Result.java and StepExecutionOutcome.java.
+Original Java author: Teddy Chen. Modified for Python;
+see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 

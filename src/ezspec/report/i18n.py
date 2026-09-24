@@ -1,4 +1,9 @@
-"""Small, dependency-free Gherkin keyword catalogue for reports."""
+"""Small, dependency-free Gherkin keyword catalogue for reports.
+
+Python implementation informed by ezSpec's GherkinKeywords.java and its
+English/Traditional Chinese report vocabulary. See NOTICE and
+docs/SOURCE_PROVENANCE.md for source and project attribution.
+"""
 
 from __future__ import annotations
 

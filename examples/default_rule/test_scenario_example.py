@@ -1,4 +1,8 @@
-"""Port of ezspec-sample's default-rule Scenario example."""
+"""Port of ezspec-sample's default-rule Scenario example.
+
+Adapted from example/defaultrule/ScenarioExample.java for Python and pytest.
+See NOTICE and docs/SOURCE_PROVENANCE.md for source and project attribution.
+"""
 
 from ezspec import EzFeature, EzScenario, Feature, ScenarioEnvironment
 

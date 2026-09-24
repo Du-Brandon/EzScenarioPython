@@ -1,4 +1,8 @@
-"""Serializable report DTOs compatible with the Java ezSpec JSON schema."""
+"""Serializable report DTOs compatible with the Java ezSpec JSON schema.
+
+Adapted from ezspec-report's report/*Dto.java into Python dataclasses and protocols.
+See NOTICE and docs/SOURCE_PROVENANCE.md for source and project attribution.
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,8 @@
-"""Step-description arguments."""
+"""Step-description arguments.
+
+Adapted from ezSpec's Argument.java. Original Java author: Teddy Chen.
+Modified for Python; see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 

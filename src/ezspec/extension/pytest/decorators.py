@@ -1,8 +1,14 @@
-"""pytest-compatible decorators mirroring ezSpec's JUnit 5 annotations."""
+"""pytest-compatible decorators mirroring ezSpec's JUnit 5 annotations.
+
+Python adaptation of ezSpec's EzFeature and extension/junit5/Ez* annotations,
+with pytest metadata and collection-time examples. See NOTICE and
+docs/SOURCE_PROVENANCE.md for source and project attribution.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import wraps
 from typing import Any, TypeVar, overload
 
@@ -11,6 +17,18 @@ from ...runtime_context import rule_scope
 
 F = TypeVar("F", bound=Callable[..., Any])
 C = TypeVar("C", bound=type[Any])
+_UNSET = object()
+
+
+@dataclass(frozen=True, slots=True)
+class OutlineConfig:
+    """A declaration of collection-time data, separate from rule metadata."""
+
+    examples: object
+
+
+def get_outline_config(function: Any) -> OutlineConfig | None:
+    return getattr(function, "__ezspec_outline_config__", None)
 
 
 def _mark(target: F | C, kind: str, **metadata: str) -> F | C:
@@ -18,7 +36,9 @@ def _mark(target: F | C, kind: str, **metadata: str) -> F | C:
     kinds = set(getattr(target, "__ezspec_kinds__", ()))
     kinds.add(kind)
     setattr(target, "__ezspec_kinds__", frozenset(kinds))
-    setattr(target, "__ezspec_metadata__", metadata)
+    combined_metadata = dict(getattr(target, "__ezspec_metadata__", {}))
+    combined_metadata.update(metadata)
+    setattr(target, "__ezspec_metadata__", combined_metadata)
     return target
 
 
@@ -65,6 +85,7 @@ def _scenario_decorator(
     function: F | None,
     *,
     rule: str,
+    examples: object = _UNSET,
 ) -> F | Callable[[F], F]:
     def decorate(target: F) -> F:
         @wraps(target)
@@ -80,6 +101,8 @@ def _scenario_decorator(
             with rule_scope(selected_rule):
                 return target(*args, **kwargs)
 
+        if examples is not _UNSET:
+            wrapped.__ezspec_outline_config__ = OutlineConfig(examples)
         return _mark(wrapped, kind, rule=rule)  # type: ignore[return-value]
 
     return decorate if function is None else decorate(function)
@@ -107,7 +130,9 @@ def EzScenarioOutline(function: F, /) -> F: ...
 
 
 @overload
-def EzScenarioOutline(*, rule: str = "") -> Callable[[F], F]: ...
+def EzScenarioOutline(
+    *, rule: str = "", examples: object = _UNSET
+) -> Callable[[F], F]: ...
 
 
 def EzScenarioOutline(
@@ -115,8 +140,11 @@ def EzScenarioOutline(
     /,
     *,
     rule: str = "",
+    examples: object = _UNSET,
 ) -> F | Callable[[F], F]:
-    return _scenario_decorator("scenario_outline", function, rule=rule)
+    return _scenario_decorator(
+        "scenario_outline", function, rule=rule, examples=examples
+    )
 
 
 @overload
@@ -141,7 +169,9 @@ def EzDynamicScenarioOutline(function: F, /) -> F: ...
 
 
 @overload
-def EzDynamicScenarioOutline(*, rule: str = "") -> Callable[[F], F]: ...
+def EzDynamicScenarioOutline(
+    *, rule: str = "", examples: object = _UNSET
+) -> Callable[[F], F]: ...
 
 
 def EzDynamicScenarioOutline(
@@ -149,5 +179,8 @@ def EzDynamicScenarioOutline(
     /,
     *,
     rule: str = "",
+    examples: object = _UNSET,
 ) -> F | Callable[[F], F]:
-    return _scenario_decorator("dynamic_scenario_outline", function, rule=rule)
+    return _scenario_decorator(
+        "dynamic_scenario_outline", function, rule=rule, examples=examples
+    )

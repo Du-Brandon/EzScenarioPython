@@ -1,4 +1,8 @@
-"""Constants matching ezSpec's built-in test tag vocabulary."""
+"""Constants matching ezSpec's built-in test tag vocabulary.
+
+Adapted from ezSpec's EzSpecTag.java and LivingDoc.java into Python constants.
+See NOTICE and docs/SOURCE_PROVENANCE.md for source and project attribution.
+"""
 
 
 class EzSpecTag:

@@ -1,11 +1,26 @@
-"""Runtime state shared by all steps in a scenario."""
+"""Shared scenario values with isolated inputs for concurrent steps.
+
+Adapted from ezSpec ScenarioEnvironment, originally authored by Teddy Chen.
+Modified for Python and concurrent step isolation; see NOTICE and
+docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, field
+from threading import RLock
+from typing import Any, Iterable, Iterator
 
 from .argument import Argument
 from .table import Row, Table
+
+
+@dataclass
+class _StepContext:
+    values: dict[str, Any]
+    changed: set[str] = field(default_factory=set)
 
 
 class ScenarioEnvironment:
@@ -20,6 +35,7 @@ class ScenarioEnvironment:
     ANONYMOUS_TABLE_KEY = "$ANONYMOUS_TABLE"
     ARGUMENTS_KEY = "$ARGUMENTS"
     HISTORICAL_ARGUMENTS_KEY = "$HISTORICAL_ARGUMENTS"
+    _STEP_KEYS = frozenset({ARGUMENTS_KEY, ANONYMOUS_TABLE_KEY})
 
     def __init__(self) -> None:
         self.execution_count = 0
@@ -27,6 +43,44 @@ class ScenarioEnvironment:
             self.ARGUMENTS_KEY: [],
             self.HISTORICAL_ARGUMENTS_KEY: [],
         }
+        self._step_context: ContextVar[_StepContext | None] = ContextVar(
+            "ezspec_step_context", default=None
+        )
+        self._history_lock = RLock()
+
+    def _capture_step_context(self) -> _StepContext:
+        """Snapshot a group's inputs before any of its workers can modify them."""
+
+        values: dict[str, Any] = {self.ARGUMENTS_KEY: list(self.getArgs())}
+        source = self._value_context(self.ANONYMOUS_TABLE_KEY)
+        if self.ANONYMOUS_TABLE_KEY in source:
+            values[self.ANONYMOUS_TABLE_KEY] = source[self.ANONYMOUS_TABLE_KEY]
+        return _StepContext(values)
+
+    @contextmanager
+    def _step_scope(self, state: _StepContext) -> Iterator[None]:
+        token = self._step_context.set(state)
+        try:
+            yield
+        finally:
+            self._step_context.reset(token)
+
+    def _merge_step_contexts(self, states: Iterable[_StepContext]) -> None:
+        """Commit completed inputs in declaration order after the group barrier.
+
+        History was recorded at invocation time and must not be appended again.
+        A nested group commits to its enclosing step's context.
+        """
+
+        for state in states:
+            for key in state.changed:
+                self.put(key, state.values[key])
+
+    def _value_context(self, key: str) -> dict[str, Any]:
+        state = self._step_context.get()
+        if state is not None and key in self._STEP_KEYS:
+            return state.values
+        return self._context
 
     @classmethod
     def create(cls) -> ScenarioEnvironment:
@@ -42,7 +96,7 @@ class ScenarioEnvironment:
 
         if env.INPUT_KEY in env._context:
             cloned.put(cls.INPUT_KEY, env.getInput())
-        if env.ANONYMOUS_TABLE_KEY in env._context:
+        if env.ANONYMOUS_TABLE_KEY in env._value_context(env.ANONYMOUS_TABLE_KEY):
             cloned.setAnonymousTable(env.get(cls.ANONYMOUS_TABLE_KEY, Table))
 
         reserved = {
@@ -77,7 +131,16 @@ class ScenarioEnvironment:
     set_execution_count = setExecutionCount
 
     def addContext(self, runtime: ScenarioEnvironment) -> None:
-        self._context.update(runtime._context)
+        values = dict(runtime._context)
+        state = runtime._step_context.get()
+        if state is not None:
+            for key in self._STEP_KEYS:
+                if key in state.values:
+                    values[key] = state.values[key]
+                else:
+                    values.pop(key, None)
+        for key, value in values.items():
+            self.put(key, value)
 
     add_context = addContext
 
@@ -99,16 +162,21 @@ class ScenarioEnvironment:
         return self.table().row(index_or_first_column)
 
     def put(self, key: str, value: Any) -> ScenarioEnvironment:
-        self._context[key] = value
+        state = self._step_context.get()
+        if state is not None and key in self._STEP_KEYS:
+            state.values[key] = value
+            state.changed.add(key)
+        else:
+            self._context[key] = value
         return self
 
     def get(self, key: str, cls: type[Any] | None = None) -> Any:
         # Java's Class argument only controls its generic cast.  Deliberately do
         # not coerce here; callers receive the same object that was put in.
-        return self._context.get(key)
+        return self._value_context(key).get(key)
 
     def gets(self, key: str) -> str:
-        value = self._context.get(key, "")
+        value = self._value_context(key).get(key, "")
         return value if isinstance(value, str) else str(value)
 
     def geti(self, key: str) -> int:
@@ -123,7 +191,8 @@ class ScenarioEnvironment:
     get_args = getArgs
 
     def getHistoricalArgs(self) -> tuple[Argument, ...]:
-        return tuple(self._historical_arguments())
+        with self._history_lock:
+            return tuple(self._historical_arguments())
 
     get_historical_args = getHistoricalArgs
 
@@ -157,10 +226,11 @@ class ScenarioEnvironment:
     get_argd = getArgd
 
     def getHistoricalArg(self, index_or_key: int | str) -> str:
+        historical = self.getHistoricalArgs()
         if isinstance(index_or_key, int):
-            return self._argument_value(self._historical_arguments()[index_or_key])
+            return self._argument_value(historical[index_or_key])
 
-        for argument in self._historical_arguments():
+        for argument in historical:
             if self._argument_key(argument) == index_or_key:
                 return self._argument_value(argument)
         raise LookupError(f"Historical argument not found: {index_or_key}")
@@ -168,21 +238,26 @@ class ScenarioEnvironment:
     get_historical_arg = getHistoricalArg
 
     def setArguments(self, arguments: Iterable[Argument]) -> None:
+        values = list(arguments)
         current = self._arguments()
         current.clear()
-        current.extend(arguments)
-        self._historical_arguments().extend(current)
+        current.extend(values)
+        state = self._step_context.get()
+        if state is not None:
+            state.changed.add(self.ARGUMENTS_KEY)
+        with self._history_lock:
+            self._historical_arguments().extend(values)
 
     set_arguments = setArguments
 
     def _arguments(self) -> list[Argument]:
-        return self._context[self.ARGUMENTS_KEY]
+        return self._value_context(self.ARGUMENTS_KEY)[self.ARGUMENTS_KEY]
 
     def _historical_arguments(self) -> list[Argument]:
         return self._context[self.HISTORICAL_ARGUMENTS_KEY]
 
     def _require_anonymous_table(self) -> None:
-        if self.ANONYMOUS_TABLE_KEY not in self._context:
+        if self.ANONYMOUS_TABLE_KEY not in self._value_context(self.ANONYMOUS_TABLE_KEY):
             raise RuntimeError("No anonymous table in the scenario.")
 
     @staticmethod

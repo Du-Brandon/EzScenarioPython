@@ -1,4 +1,9 @@
-"""Feature rules and reusable scenario backgrounds."""
+"""Feature rules and reusable scenario backgrounds.
+
+Adapted from ezSpec's Rule.java and Background.java.
+Original Java author: Teddy Chen. Modified for Python;
+see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,8 @@
-"""Small formatting helpers retained from ezSpec's ``SpecUtils``."""
+"""Small formatting helpers retained from ezSpec's ``SpecUtils``.
+
+Adapted from ezSpec's SpecUtils.java. Original Java author: Teddy Chen.
+Modified for Python; see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 

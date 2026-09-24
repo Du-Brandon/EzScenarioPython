@@ -1,4 +1,9 @@
-"""Gherkin ``Examples`` data used by scenario outlines."""
+"""Gherkin ``Examples`` data used by scenario outlines.
+
+Adapted from ezSpec's Example.java and Examples.java.
+Original Java author: Teddy Chen. Modified for Python;
+see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 

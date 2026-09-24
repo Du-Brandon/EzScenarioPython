@@ -1,4 +1,9 @@
-"""Exceptions used by the ezSpec execution model."""
+"""Exceptions used by the ezSpec execution model.
+
+Adapted from ezSpec's EzSpecError.java and PendingException.java.
+Original Java author: Teddy Chen. Modified for Python;
+see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 

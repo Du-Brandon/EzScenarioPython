@@ -1,4 +1,9 @@
-"""Gherkin-style data-table models."""
+"""Gherkin-style data-table models.
+
+Adapted from ezSpec's table/Header.java, Row.java, and Table.java.
+Original Java author: Teddy Chen. Modified for Python;
+see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 

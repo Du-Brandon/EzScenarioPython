@@ -3,6 +3,9 @@
 This module is the Python counterpart of ezSpec's ``Junit5Examples``.  A
 concrete subclass supplies a raw Gherkin table and can use the same data for
 both a scenario outline and ``pytest.mark.parametrize``.
+
+Original Java author: Teddy Chen. Modified for Python and pytest;
+see NOTICE and docs/SOURCE_PROVENANCE.md.
 """
 
 from __future__ import annotations

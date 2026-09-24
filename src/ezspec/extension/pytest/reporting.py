@@ -1,4 +1,9 @@
-"""pytest lifecycle hooks for ezSpec report generation."""
+"""pytest lifecycle hooks for ezSpec report generation.
+
+Python implementation informed by ezSpec's EzSpecReportExtension.java.
+Original Java reference author: Teddy Chen. Reworked for pytest lifecycle hooks;
+see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +17,16 @@ from ...report.decorators import (
     is_report_disabled,
 )
 from ...report.generator import generate_feature_report
+from .registry import (
+    begin_attempt,
+    format_item_steps,
+    get_registry,
+    mark_selected,
+    record_phase,
+    record_runtime,
+    register_item,
+    validate_definition,
+)
 
 
 _REPORT_CLASSES = pytest.StashKey[tuple[type[Any], ...]]()
@@ -69,13 +84,31 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     del exitstatus
     config = session.config
     output_dir = config.getoption("ezspec_report_dir")
+    registry = get_registry(config)
     for owner in config.stash.get(_REPORT_CLASSES, ()):
         report_config = get_report_config(owner) or ReportConfig()
-        generate_feature_report(owner, report_config, output_dir=output_dir)
+        execution = registry.feature_snapshot(owner)
+        if execution["groups"]:
+            generate_feature_report(
+                owner,
+                report_config,
+                output_dir=output_dir,
+                execution_snapshot=execution,
+            )
+        else:
+            generate_feature_report(owner, report_config, output_dir=output_dir)
 
 
 __all__ = [
+    "begin_attempt",
+    "format_item_steps",
+    "get_registry",
+    "mark_selected",
     "pytest_addoption",
     "pytest_collection_modifyitems",
     "pytest_sessionfinish",
+    "record_phase",
+    "record_runtime",
+    "register_item",
+    "validate_definition",
 ]

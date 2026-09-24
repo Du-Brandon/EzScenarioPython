@@ -1,4 +1,8 @@
-"""A scenario assigned to a user-created Rule."""
+"""A scenario assigned to a user-created Rule.
+
+Adapted from ezspec-sample's example/rules/ScenarioExample.java for Python
+and pytest. See NOTICE and docs/SOURCE_PROVENANCE.md for source and attribution.
+"""
 
 from ezspec import EzFeature, EzScenario, Feature, ScenarioEnvironment
 

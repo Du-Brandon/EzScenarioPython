@@ -1,4 +1,9 @@
-"""Scenario Outline execution over one or more Examples tables."""
+"""Scenario Outline execution over one or more Examples tables.
+
+Adapted from ezSpec's ScenarioOutline.java. Original Java author: Teddy Chen.
+Modified for Python, including shared per-case construction;
+see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 
@@ -25,6 +30,35 @@ def _caller_name() -> str:
         return caller.f_code.co_name if caller else "scenario_outline"
     finally:
         del frame
+
+
+def build_runtime_steps(raw_steps: Iterable["Step"], scenario: RuntimeScenario) -> None:
+    """Copy template steps into a row with the legacy variable semantics."""
+    table = scenario.activeTable()
+    environment = scenario.getEnvironment()
+    for raw_step in raw_steps:
+        description = ScenarioOutline._replace_variables(raw_step.description(), table)
+        for key in ScenarioOutline._variables(raw_step.description()):
+            value = table.get(key)
+            stored: object = Table(value) if Table.containsTable(value) else value
+            environment.put(key, stored)
+
+        method_name = {
+            "Given": "Given",
+            "When": "When",
+            "Then": "Then",
+            "And": "And",
+            "But": "But",
+            "Then success": "ThenSuccess",
+            "Then failure": "ThenFailure",
+        }.get(raw_step.getName())
+        if method_name is None:
+            raise RuntimeError(f"Unsupported step: {raw_step.getName()}")
+        getattr(scenario, method_name)(
+            description,
+            raw_step.isContinuousAfterFailure(),
+            raw_step.getCallback(),
+        )
 
 
 class ScenarioOutline(RuntimeScenario):
@@ -154,32 +188,7 @@ class ScenarioOutline(RuntimeScenario):
 
     def _build_runtime_steps(self, scenario: RuntimeScenario) -> None:
         scenario.getSteps().clear()
-        table = scenario.activeTable()
-        environment = scenario.getEnvironment()
-        for raw_step in self.getSteps():
-            description = self._replace_variables(raw_step.description(), table)
-            for key in self._variables(raw_step.description()):
-                value = table.get(key)
-                stored: object = Table(value) if Table.containsTable(value) else value
-                environment.put(key, stored)
-
-            method_name = {
-                "Given": "Given",
-                "When": "When",
-                "Then": "Then",
-                "And": "And",
-                "But": "But",
-                "Then success": "ThenSuccess",
-                "Then failure": "ThenFailure",
-            }.get(raw_step.getName())
-            if method_name is None:
-                raise RuntimeError(f"Unsupported step: {raw_step.getName()}")
-            method = getattr(scenario, method_name)
-            method(
-                description,
-                raw_step.isContinuousAfterFailure(),
-                raw_step.getCallback(),
-            )
+        build_runtime_steps(self.getSteps(), scenario)
 
     def getAllExamples(self) -> tuple[Example, ...]:
         return tuple(self._all_examples)

@@ -1,4 +1,9 @@
-"""Filesystem report generator for executed ezSpec feature classes."""
+"""Filesystem report generator for executed ezSpec feature classes.
+
+Python implementation informed by ezSpec's EzSpecReportExtension.java.
+Original Java reference author: Teddy Chen. Reworked for Python report output;
+see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 
@@ -52,6 +57,7 @@ def generate_feature_report(
     config: ReportConfig,
     *,
     output_dir: str | PathLike[str] | None = None,
+    execution_snapshot: dict[str, Any] | None = None,
 ) -> tuple[Path, ...]:
     """Generate the configured reports for ``owner.feature``.
 
@@ -79,9 +85,31 @@ def generate_feature_report(
         path = destination / f"{stem}.{report_format}"
         if report_format == "txt":
             content = _render_text(feature, language=config.language)
+            if execution_snapshot and execution_snapshot["groups"]:
+                from .outline_projection import render_outline_text
+
+                addition = render_outline_text(execution_snapshot, language=config.language)
+                content = f"{content}\n\n{addition}" if content else addition
         else:
-            content = _render_json(feature)
+            if execution_snapshot and execution_snapshot["groups"]:
+                import json
+
+                from .outline_projection import merged_feature_dict
+
+                content = json.dumps(
+                    merged_feature_dict(feature, execution_snapshot),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            else:
+                content = _render_json(feature)
         path.write_text(content, encoding="utf-8")
+        generated.append(path)
+    if execution_snapshot and execution_snapshot["groups"]:
+        from .outline_projection import render_execution_json
+
+        path = destination / f"{stem}.execution.json"
+        path.write_text(render_execution_json(execution_snapshot), encoding="utf-8")
         generated.append(path)
     return tuple(generated)
 

@@ -1,0 +1,37 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }} / pytest ${{ matrix.pytest }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.12", "3.13"]
+        pytest: ["8.3.3", "9.1.1"]
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install from checkout
+        run: python -m pip install -e ".[dev]" "pytest==${{ matrix.pytest }}"
+      - name: Run specifications and regression tests
+        run: python -B -m pytest -q -p no:cacheprovider -W error::RuntimeWarning
+      - name: Generate example reports
+        run: python -B -m pytest examples -q -p no:cacheprovider --ezspec-report

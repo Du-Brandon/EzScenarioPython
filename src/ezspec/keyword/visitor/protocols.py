@@ -1,4 +1,9 @@
-"""Visitor contracts used by Feature, Rule, Scenario, and Step objects."""
+"""Visitor contracts used by Feature, Rule, Scenario, and Step objects.
+
+Adapted from ezSpec's SpecificationElement.java and SpecificationElementVisitor.java.
+Original Java author: Teddy Chen. Modified into Python protocols;
+see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 

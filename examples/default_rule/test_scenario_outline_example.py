@@ -1,4 +1,9 @@
-"""Port of ezspec-sample's default-rule Scenario Outline examples."""
+"""Port of ezspec-sample's default-rule Scenario Outline examples.
+
+Adapted from example/defaultrule/ScenarioOutlineExample.java for Python,
+pytest, and collection-time examples. See NOTICE and docs/SOURCE_PROVENANCE.md
+for source and project attribution.
+"""
 
 from __future__ import annotations
 
@@ -110,6 +115,12 @@ class change_root_stage_order_examples(PytestExamples):
         return table
 
 
+TAX_CALCULATION_EXAMPLE = PytestExamples.get(tax_calculation_examples)
+ZERO_DOLLAR_INVOICE_EXAMPLE = PytestExamples.get(zero_dollar_invoice_examples)
+TAX_EXAMPLES = [TAX_CALCULATION_EXAMPLE, ZERO_DOLLAR_INVOICE_EXAMPLE]
+ROOT_STAGE_ORDER_EXAMPLE = PytestExamples.get(change_root_stage_order_examples)
+
+
 def remember_tax_excluded_price(env: ScenarioEnvironment) -> None:
     inputs = env.getInput()
     assert inputs is not None
@@ -170,11 +181,10 @@ def verify_workflow(env: ScenarioEnvironment) -> None:
 class ScenarioOutlineExample:
     feature = Feature.New("scenario outline example")
 
-    @EzScenarioOutline
-    def scenario_outline_example_with_table_input(self) -> None:
-        (
-            self.feature.newScenarioOutline()
-            .WithExamples(TAX_CALCULATION_RAW_DATA)
+    @EzScenarioOutline(examples=TAX_CALCULATION_RAW_DATA)
+    def scenario_outline_example_with_table_input(self):
+        return (
+            self.feature.defineScenarioOutline()
             .Given(
                 "the tax excluded price of a computer is <tax_excluded>",
                 remember_tax_excluded_price,
@@ -182,17 +192,12 @@ class ScenarioOutlineExample:
             .And("the VAT rate is <vat_rate>", remember_vat_rate)
             .When("I buy the computer", calculate_tax_included_price)
             .Then("I need to pay <total_price>", verify_total_price)
-            .Execute()
         )
 
-    @EzScenarioOutline
-    def scenario_outline_example_with_variable_arguments(self) -> None:
-        (
-            self.feature.newScenarioOutline()
-            .WithExamples(
-                PytestExamples.get(tax_calculation_examples),
-                PytestExamples.get(zero_dollar_invoice_examples),
-            )
+    @EzScenarioOutline(examples=(TAX_CALCULATION_EXAMPLE, ZERO_DOLLAR_INVOICE_EXAMPLE))
+    def scenario_outline_example_with_variable_arguments(self):
+        return (
+            self.feature.defineScenarioOutline()
             .Given(
                 "the tax excluded price of a computer is <tax_excluded>",
                 remember_tax_excluded_price,
@@ -200,19 +205,12 @@ class ScenarioOutlineExample:
             .And("the VAT rate is <vat_rate>", remember_vat_rate)
             .When("I buy the computer", calculate_tax_included_price)
             .Then("I need to pay <total_price>", verify_total_price)
-            .Execute()
         )
 
-    @EzScenarioOutline
-    def scenario_outline_example_with_list_of_example(self) -> None:
-        examples = [
-            PytestExamples.get(tax_calculation_examples),
-            PytestExamples.get(zero_dollar_invoice_examples),
-        ]
-
-        (
-            self.feature.newScenarioOutline()
-            .WithExamples(examples)
+    @EzScenarioOutline(examples=TAX_EXAMPLES)
+    def scenario_outline_example_with_list_of_example(self):
+        return (
+            self.feature.defineScenarioOutline()
             .Given(
                 "the tax excluded price of a computer is <tax_excluded>",
                 remember_tax_excluded_price,
@@ -220,14 +218,12 @@ class ScenarioOutlineExample:
             .And("the VAT rate is <vat_rate>", remember_vat_rate)
             .When("I buy the computer", calculate_tax_included_price)
             .Then("I need to pay <total_price>", verify_total_price)
-            .Execute()
         )
 
-    @EzScenarioOutline
-    def moving_root_stages_and_sub_lanes(self) -> None:
-        (
-            self.feature.newScenarioOutline()
-            .WithExamples(PytestExamples.get(change_root_stage_order_examples))
+    @EzScenarioOutline(examples=ROOT_STAGE_ORDER_EXAMPLE)
+    def moving_root_stages_and_sub_lanes(self):
+        return (
+            self.feature.defineScenarioOutline()
             .Given("the following workflow:\n <given_workflow>", remember_workflow)
             .When(
                 "I move <lane_name> to position <new_position> "
@@ -238,5 +234,4 @@ class ScenarioOutlineExample:
                 "the workflow looks like the following:\n<expected_workflow>",
                 verify_workflow,
             )
-            .Execute()
         )

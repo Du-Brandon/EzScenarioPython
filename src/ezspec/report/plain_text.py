@@ -1,4 +1,8 @@
-"""Plain-text renderer for an executed ezSpec feature tree."""
+"""Plain-text renderer for an executed ezSpec feature tree.
+
+Adapted from ezSpec's PlainTextReport.java. Original Java author: Teddy Chen.
+Modified for Python rendering; see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 

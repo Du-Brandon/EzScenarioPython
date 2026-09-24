@@ -1,4 +1,8 @@
-"""JSON rendering for executed ezSpec feature trees."""
+"""JSON rendering for executed ezSpec feature trees.
+
+Python implementation using the standard json module and ezSpec's DTO schema.
+See NOTICE and docs/SOURCE_PROVENANCE.md for the schema's source and attribution.
+"""
 
 from __future__ import annotations
 

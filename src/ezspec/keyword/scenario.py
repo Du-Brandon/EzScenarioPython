@@ -1,31 +1,36 @@
-"""Scenario model and sequential/concurrent execution engine."""
+"""Scenario model and sequential/concurrent execution engine.
+
+Adapted from ezSpec Scenario/RuntimeScenario, originally authored by Teddy Chen.
+Modified for Python and concurrent step isolation; see NOTICE and
+docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 
+import inspect
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from ezspec.exception import EzSpecError, PendingException
 
-from .environment import ScenarioEnvironment
+from .environment import ScenarioEnvironment, _StepContext
+from .registration import StepRegistrationMixin
 from .result import Result
-from .step import (
-    CONCURRENT_GROUP_STARTS,
-    And,
-    But,
-    Given,
-    Step,
-    StepCallback,
-    Then,
-    ThenFailure,
-    ThenSuccess,
-    When,
-)
+from .step import CONCURRENT_GROUP_STARTS, Step, StepCallback
 from .table import Table
 
 if TYPE_CHECKING:
+    from .definition import OutlineDefinition
     from .rule import Background, Rule
     from .scenario_outline import ScenarioOutline
+
+
+@dataclass
+class _StepTable:
+    value: Table
+    changed: bool = False
 
 
 class Scenario:
@@ -48,6 +53,9 @@ class Scenario:
         self._steps: list[Step] = []
         self.rule = rule
         self.index = 0
+        self._step_table: ContextVar[_StepTable | None] = ContextVar(
+            "ezspec_active_step_table", default=None
+        )
 
         if background is not None:
             self.runtime = ScenarioEnvironment.clone(background.getEnvironment())
@@ -58,6 +66,28 @@ class Scenario:
 
         # Java field spelling is retained for integrations which inspect it.
         self.lookupTable = self.lookup_table
+
+    @property
+    def lookup_table(self) -> Table:
+        state = self._step_table.get()
+        return state.value if state is not None else self._lookup_table
+
+    @lookup_table.setter
+    def lookup_table(self, table: Table) -> None:
+        state = self._step_table.get()
+        if state is None:
+            self._lookup_table = table
+        else:
+            state.value = table
+            state.changed = True
+
+    @property
+    def lookupTable(self) -> Table:
+        return self.lookup_table
+
+    @lookupTable.setter
+    def lookupTable(self, table: Table) -> None:
+        self.lookup_table = table
 
     def getEnvironment(self) -> ScenarioEnvironment:
         return self.runtime
@@ -145,7 +175,7 @@ class Scenario:
     build_spec_error = _buildSpecError
 
 
-class RuntimeScenario(Scenario):
+class RuntimeScenario(Scenario, StepRegistrationMixin):
     """Stores step callbacks and executes them against one environment."""
 
     def __init__(
@@ -155,7 +185,7 @@ class RuntimeScenario(Scenario):
         table: Table | None = None,
         background: Background | None = None,
         *,
-        outline: ScenarioOutline | None = None,
+        outline: ScenarioOutline | OutlineDefinition | None = None,
         index: int = 0,
         background_runtime: ScenarioEnvironment | None = None,
     ) -> None:
@@ -181,122 +211,10 @@ class RuntimeScenario(Scenario):
 
     is_from_scenario_outline = isFromScenarioOutline
 
-    def getScenarioOutline(self) -> ScenarioOutline | None:
+    def getScenarioOutline(self) -> ScenarioOutline | OutlineDefinition | None:
         return self.from_outline
 
     get_scenario_outline = getScenarioOutline
-
-    @staticmethod
-    def _callback_args(
-        continuous_or_callback: bool | StepCallback,
-        callback: StepCallback | None,
-    ) -> tuple[bool, StepCallback]:
-        if callback is None and callable(continuous_or_callback):
-            return Step.TerminateAfterFailure, continuous_or_callback
-        if callback is None or not callable(callback):
-            raise TypeError("callback must be callable")
-        return bool(continuous_or_callback), callback
-
-    def _append(
-        self,
-        step_type: type[Step],
-        description: str,
-        continuous_or_callback: bool | StepCallback,
-        callback: StepCallback | None = None,
-    ) -> RuntimeScenario:
-        continuous, resolved_callback = self._callback_args(
-            continuous_or_callback, callback
-        )
-        self._steps.append(step_type(description, continuous, resolved_callback))
-        return self
-
-    def Given(
-        self,
-        description: str,
-        continuous_or_callback: bool | StepCallback,
-        callback: StepCallback | None = None,
-    ) -> RuntimeScenario:
-        return self._append(Given, description, continuous_or_callback, callback)
-
-    given = Given
-
-    def When(
-        self,
-        description: str,
-        continuous_or_callback: bool | StepCallback,
-        callback: StepCallback | None = None,
-    ) -> RuntimeScenario:
-        return self._append(When, description, continuous_or_callback, callback)
-
-    when = When
-
-    def Then(
-        self,
-        description: str,
-        continuous_or_callback: bool | StepCallback,
-        callback: StepCallback | None = None,
-    ) -> RuntimeScenario:
-        return self._append(Then, description, continuous_or_callback, callback)
-
-    then = Then
-
-    def And(
-        self,
-        description: str,
-        continuous_or_callback: bool | StepCallback,
-        callback: StepCallback | None = None,
-    ) -> RuntimeScenario:
-        return self._append(And, description, continuous_or_callback, callback)
-
-    and_ = And
-
-    def But(
-        self,
-        description: str,
-        continuous_or_callback: bool | StepCallback,
-        callback: StepCallback | None = None,
-    ) -> RuntimeScenario:
-        return self._append(But, description, continuous_or_callback, callback)
-
-    but = But
-
-    @staticmethod
-    def _then_special_args(args: tuple[Any, ...]) -> tuple[str, bool, StepCallback]:
-        description = ""
-        continuous = Step.TerminateAfterFailure
-        callback: StepCallback | None = None
-
-        if len(args) == 1 and callable(args[0]):
-            callback = args[0]
-        elif len(args) == 2 and isinstance(args[0], bool) and callable(args[1]):
-            continuous, callback = args
-        elif len(args) == 2 and isinstance(args[0], str) and callable(args[1]):
-            description, callback = args
-        elif (
-            len(args) == 3
-            and isinstance(args[0], str)
-            and isinstance(args[1], bool)
-            and callable(args[2])
-        ):
-            description, continuous, callback = args
-        else:
-            raise TypeError(
-                "expected callback, bool/callback, description/callback, "
-                "or description/bool/callback"
-            )
-        return description, continuous, callback
-
-    def ThenSuccess(self, *args: Any) -> RuntimeScenario:
-        description, continuous, callback = self._then_special_args(args)
-        return self._append(ThenSuccess, description, continuous, callback)
-
-    then_success = ThenSuccess
-
-    def ThenFailure(self, *args: Any) -> RuntimeScenario:
-        description, continuous, callback = self._then_special_args(args)
-        return self._append(ThenFailure, description, continuous, callback)
-
-    then_failure = ThenFailure
 
     def invokeStep(self, step: Step, description: str, callback: StepCallback) -> None:
         self.runtime.setArguments(Step.parseArguments(description))
@@ -304,7 +222,22 @@ class RuntimeScenario(Scenario):
             self.lookup_table = Table(description)
             self.lookupTable = self.lookup_table
             self.runtime.setAnonymousTable(self.lookup_table)
-        callback(self.getEnvironment())
+        callback_result = callback(self.getEnvironment())
+        if self.from_outline is not None:
+            from .definition import OutlineDefinition
+
+            if isinstance(self.from_outline, OutlineDefinition) and (
+                inspect.isawaitable(callback_result)
+                or inspect.isasyncgen(callback_result)
+                or inspect.isgenerator(callback_result)
+            ):
+                if inspect.iscoroutine(callback_result) or inspect.isgenerator(
+                    callback_result
+                ):
+                    callback_result.close()
+                raise TypeError(
+                    "OutlineDefinition callbacks must be synchronous and must not be generators"
+                )
         step.setResult(Result.Success())
 
     invoke_step = invokeStep
@@ -358,6 +291,16 @@ class RuntimeScenario(Scenario):
 
     dynamic_execute = DynamicExecute
 
+    def _execute_concurrent_step(
+        self, step: Step, context: _StepContext, table: _StepTable
+    ) -> None:
+        token = self._step_table.set(table)
+        try:
+            with self.runtime._step_scope(context):
+                self.executeStep(step)
+        finally:
+            self._step_table.reset(token)
+
     def doExecuteConcurrently(self) -> int:
         if self._steps and not isinstance(self._steps[0], CONCURRENT_GROUP_STARTS):
             raise RuntimeError(
@@ -373,8 +316,13 @@ class RuntimeScenario(Scenario):
                 next_group += 1
 
             group = self._steps[current:next_group]
+            contexts = [self.runtime._capture_step_context() for _ in group]
+            tables = [_StepTable(self.lookup_table) for _ in group]
             with ThreadPoolExecutor(max_workers=len(group)) as executor:
-                futures = [executor.submit(self.executeStep, step) for step in group]
+                futures = [
+                    executor.submit(self._execute_concurrent_step, step, context, table)
+                    for step, context, table in zip(group, contexts, tables, strict=True)
+                ]
                 for future in futures:
                     try:
                         future.result()
@@ -382,6 +330,11 @@ class RuntimeScenario(Scenario):
                         # Results retain every failure; group policy is evaluated
                         # only after all callbacks in this group have completed.
                         pass
+
+            self.runtime._merge_step_contexts(contexts)
+            for table in tables:
+                if table.changed:
+                    self.lookup_table = table.value
 
             current = next_group
             if any(

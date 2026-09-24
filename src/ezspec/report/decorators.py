@@ -1,4 +1,9 @@
-"""Class decorators that configure ezSpec report generation."""
+"""Class decorators that configure ezSpec report generation.
+
+Python adaptation of ezSpec's EzFeatureReport, DisableEzSpecReport, and
+EzSpecReportFormat annotations/settings. See NOTICE and docs/SOURCE_PROVENANCE.md
+for source and project attribution.
+"""
 
 from __future__ import annotations
 

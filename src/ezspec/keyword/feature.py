@@ -1,4 +1,9 @@
-"""Top-level Gherkin feature model."""
+"""Top-level Gherkin feature model.
+
+Adapted from ezSpec's Feature.java. Original Java author: Teddy Chen.
+Modified for Python, including declarative outlines;
+see NOTICE and docs/SOURCE_PROVENANCE.md.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +11,7 @@ import inspect
 
 from ezspec.runtime_context import current_rule
 
+from .definition import OutlineDefinition
 from .rule import Background, Rule
 from .scenario import Scenario
 from .scenario_outline import ScenarioOutline
@@ -86,6 +92,17 @@ class Feature:
         selected_rule = current_rule()
         return outline.withRule(selected_rule) if selected_rule else outline
 
+    def defineScenarioOutline(
+        self, name: str | None = None, description: str = ""
+    ) -> OutlineDefinition:
+        definition = OutlineDefinition(
+            _caller_name() if name is None else name,
+            description,
+            self._default_rule,
+        )
+        selected_rule = current_rule()
+        return definition.withRule(selected_rule) if selected_rule else definition
+
     def getDefaultRule(self) -> Rule:
         return self._default_rule
 
@@ -124,6 +141,7 @@ class Feature:
     get_description = getDescription
     new_scenario = newScenario
     new_scenario_outline = newScenarioOutline
+    define_scenario_outline = defineScenarioOutline
     get_default_rule = getDefaultRule
     clear_rule = clearRule
     feature_text = featureText
